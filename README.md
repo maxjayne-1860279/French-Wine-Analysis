@@ -8,6 +8,8 @@ The cost of wine has been increasing every year as the demand for wine goes up w
 
 As wine is one of the most popular beverages in the world, *we argue that it is important for us to understand what factors might influence reviews regarding wine*. One study found that “changes in the stated price of a sampled wine influenced not only how good volunteers thought it tasted, but the activity of a brain region that is involved in our experience of pleasure” (Svitil, 2008). Building on this statement, we aim to test whether it is appropriate to say that ratings on wine are affected by their price range, as well as by a few other possible explanatory variables such as region of origin. For instance, the france region of Bordeaux is known for producing high quality wine, as mentioned by Morais (2017), “Bordeaux is considered to be the largest fine-wine region on earth”. Other explanatory variables that we will examine include different varieties of wine grapes and wine description length.
 
+[French-Wine-Analysis](https://maxjayne-1860279.github.io/French-Wine-Analysis/main.html)
+
 ### Bibliography
 
 Zackthoutt. (2017). Wine Reviews (Kaggle; version 4) [data set] https://www.kaggle.com/zynicide/wine-reviews
