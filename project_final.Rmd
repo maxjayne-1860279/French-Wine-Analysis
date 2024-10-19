@@ -1,0 +1,535 @@
+---
+title: "France's Finest Wines: An examination of the best reviewed wines originating from France - (Stat 311 Final Project)"
+author: "Ali Basbeth, Joncarlo Abarcar, Max Jayne"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    fig_height: 7
+    highlight: pygments
+    theme: lumen
+    toc: true
+    toc_float: true
+---
+
+```{r load-packages, include=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(openintro)
+library(kableExtra)
+library(GGally)
+library(ggridges)
+```
+
+## Section 1 - Introduction
+
+&emsp;Liquor has long been a recreational pleasure for humans, and we have spent countless hours as a species cultivating and refining practices of distillation and fermentation to create better tasting and more effective alcoholic concoctions. Wine is one of the most famous types of Liquor in the world, and the cost of wine has been increasing every year as the demand for wine goes up while the cost to make it increases. “Inflation in the US was 8 percent over the period 2014 to (2019), according to the US Bureau of Labor Statistics” (Kavanagh 2019) The average cost of a single wine bottle increased about \$13 over those 5 years. With how much wine is shipped around the world, the demand for wine continues to grow. The COVID-19 pandemic has only amplified the rate of inflation as supply chain shortages have only made production slow down and costs increase. All of this culminates with a massive $420 billion dollar global industry surrounding wine production and it's import and export around the world.
+
+&emsp;Over hundreds of years, there are millions of varieties of wines that have been created and produced, and among these, are varieties selected by wine tasters and appraisers and treated like famous works of art before being happily consumed. But how do these wines get this amazing acclaim? What determines whether a wine is 'good' or 'great'? Is it the price? Variety? Origin? We examine these questions and explore how wines are rated in this analysis.
+
+&emsp; Wine is one of the most popular beverages in the world. We argue that it is important for us to understand what might influence reviews regarding wine. One study found that “changes in the stated price of a sampled wine influenced not only how good volunteers thought it tasted, but the activity of a brain region that is involved in our experience of pleasure” (CalTech, 2008). Building on this statement, we want to test this hypothesis whether it is appropriate to say that ratings on wine are affected by their price range. Moreover, we will add other possible explanatory variables such as regions. For instance, the French region of Bordeaux is known for producing high quality wine, as mentioned by Morais (2017), “Bordeaux is considered to be the largest fine-wine region on earth”. Therefore, we are interested in finding out which region produces the best wine. Other explanatory variables will be the different varieties of wine grapes; these include, red wine, white wine, riesling, rosé, sparkling, and fortified wines (Masterclass 2021), as well as wine description length as robust descriptions tend to appeal more to consumers.
+
+&emsp;We have determined the potential response or outcome variable within the Wine Reviews dataset as points. The points measure indicates the number of points WineEnthusiast users rated the wine at on a scale of 1-100 and attempts to provide an overall rating of the wine. As the initial dataset contained 130,000 wines and their associated reviews, we have filtered the data in our dataset to exclusively examine wines that originate in France as a leading global wine producer. Additionally, we removed any rows that had an NA value in any of the relevant variables of interest, leaving us with around 17,000 wines and associated reviews.
+
+We have recoded multiple explanatory variables as follows:
+
+* We have created a new numerical variable log_price which takes the data from price and applied a log base 10 function. This is to provide better comparison between prices.
+
+* A new categorical variable called "expensive10_winery" is the results of the recoding of the winery variables. Since there are a total of more than 2000 wineries, I decided to average them by their mean of price, which top 10 wineries produces the most expensive wine. The value that this variable takes is "yes" for top 10 wineries that is the most expensive, and "no" for the rest of the data. 
+
+* Similarly the new categorical variable "expensive10_region" where I average the mean of price on the previously region_1 variable, and re coded it to top 10 regions that produce the most expensive wine. 
+
+* A new categorical variable Rose was added determining if the wine is of the rose grape variety. Variety can affect cost of wine, taste, smell and most important, reviews.
+
+* A new categorical variable Alsace was added determining if the wine's primary region is Alsace. Region also has a strong effect on the taste and smell of grapes and wines and therefore the reviews.
+
+* We have taken the description variable and summed the total number of characters present as a numeric variable entitled desc_char_count. The theory would be that wines with robust descriptions will have the best rating, wines with descriptions that are too long or too short may have affected ratings.
+
+* From the previous numeric variable, we have created a new categorical variable examing description length entitled long_desc which categorizes each instance of a description as long if it contains more than 250 characters and short otherwise. About 32% of the listed wines have a description categorized as long.
+
+* A new variable was recoded from the province variable named province_NS. This variable categorizes the province categories by their geogrpahical location in the north or south of France. The notable wine provinces in Northern France are Alsace, Burgundy, Champagne, and the Loire Valley. All other provinces are located in the southern half of the country. (Note: France other was categorized with Southern France due to more existing territories in Southern France such as Savoie, Malbec, and Jura provinces not included in the original province category, thus this category is presumed to be derived from smaller Southern provinces).
+
+**Data Citation**
+
+&emsp;The dataset used for this analysis, entitled _Wine Reviews: 130k wine reviews with variety, location, winery, price, and description_, is hosted publicly on Kaggle by Zackthoutt, published five years ago on June 21st, 2017 and last updated four years ago on November 27th of 2017. The dataset can be found at https://www.kaggle.com/zynicide/wine-reviews. The data used in the dataset is pulled from WineMag’s rating system: https://www.winemag.com/ratings/. (The APA citation can be found in the bibliography). The data was collected through taking reviews from a wine magazine called Wine Enthusiast during the week of June 15th, 2017 & the week of November 22nd, 2017. The reviews are submitted by various wine tasters from across the world. A brief summary of the variables in the dataset can be found below.
+
+```{r codebook, echo=FALSE}
+# Reads in codebook data from CSV
+codebook <- read.csv("http://students.washington.edu/maxjayne/stat-codebook.csv")
+
+# Creates styled table for codebook(instead of tibble)
+codebook %>%
+  kbl() %>%
+  kable_styling()
+```
+
+***
+
+## Section 2 - Model Building
+
+```{r data-setup, echo=FALSE}
+# Read in datset
+wine_data <- eval(read.csv("winemag-data-130k-v2.csv"))
+
+# Filter out rows with NA values
+wine_data_refined <- wine_data %>%
+  filter(!is.na(points)) %>%
+  filter(!is.na(price)) %>%
+  filter(!is.na(country)) %>%
+  filter(!is.na(variety)) %>%
+  filter(!is.na(description))
+
+# Filter for wines from France
+wine_data_FRA <- wine_data_refined %>%
+  filter(country == "France")
+
+# mutates three new variables: desc_char_count, log_price, province_NS
+wine_data_FRA <- wine_data_FRA %>%
+  mutate(desc_char_count = nchar(description)) %>%
+  mutate(log_price = log10(price)) %>%
+  mutate(province_NS = ifelse(province == "Alsace" |
+                              province == "Burgundy" |
+                              province == "Champagne" |
+                              province == "Loire Valley", "north", "south"))
+
+# mutates new variable: expensive10_winery
+wine_data_FRA <- wine_data_FRA %>%
+  mutate(expensive10_winery = ifelse(wine_data_FRA$winery %in% c("Château les Ormes Sorbet",
+                                                                  "Château Pétrus",
+                                                                  "Domaine du Comte Liger-Belair",
+                                                                  "Château Cheval Blanc",
+                                                                  "Château d'Yquem",
+                                                                  "Château Laville Haut-Brion",
+                                                                  "Château Haut-Brion",
+                                                                  "Château La Mission Haut-Brion",
+                                                                  "Château Ausone",
+                                                                  "Château Mouton Rothschild"),"yes","no") ) 
+
+# mutates new variable: expensive10_region
+wine_data_FRA <- wine_data_FRA %>%
+  mutate(expensive10_region = ifelse(wine_data_FRA$region_1 %in% c("La Romanée",
+                                                                    "Musigny",
+                                                                    "Montrachet",
+                                                                    "Romanée-St.-Vivant",
+                                                                    "Mazoyeres-Chambertin",
+                                                                    "Chevalier-Montrachet",
+                                                                    "Bonnes-Mares",
+                                                                    "Bienvenues Bâtard-Montrachet",
+                                                                    "Chambertin Clos de Bèze",
+                                                                    "Bâtard-Montrachet"),"yes","no") )
+```
+
+```{r training-split, echo=FALSE}
+#Set seed for random generation
+set.seed(50)
+
+# Put 80% of the data into the training set 
+# using initial_split function from tidymodels 
+FRA_wine_split <- initial_split(wine_data_FRA, prop = 0.50)
+
+# Create dataframes for the two sets:
+FRA_wine_train <- training(FRA_wine_split)
+FRA_wine_test  <- testing(FRA_wine_split)
+```
+
+### Model proposed by Ali:
+
+&emsp;After conducting in-depth analysis on the data to determine the best possible explanatory variables, I have decided to choose three explanatory  variables. The first one that I used is log10 of price. The second variable that I use is called “expensive10_winery” and “expensive10_region”. The model that I chose for the response variable of “points” is explained by the three variables that I talked about above.
+
+&emsp;The fitted model equation for the model that I proposed is below. The fitted equation below is for top 10 winery that is “yes” in the most expensive winery by their average price, and also for top 10  region that produce the most expensive wine by their average of price: 
+
+$$\hat{points} = 79.162783 + 6.601360	* log\_price - 2.373422 * expensive10\_wineryyes - 1.399671 * expensive10\_regionyes$$
+
+&emsp;My thought process in creating this model is that first of all, the data set is large, and it is very challenging for me to create a model. In addition, the x categorical variables in the data set have more than just two or three levels. With this in mind, I decided to just choose 10 wineries from the variable “winery” that has the most expensive average price of the wine that they produce, with values “yes”, and “no”. Furthermore, I have a little bit of background knowledge regarding wine, since I am a documentary lover, and I watch a lot of interesting documentaries. I have watched several of them that are related to wine. In particular, I am a Geography major, and I am personally interested in the spatial distribution of wine. Therefore, I decided to choose the variable “region” which is where the wine is produced in France. For each province, there are several regions. After doing some analysis on the data, I have found that it is appropriate to only choose the top 10 most regions that produced the most expensive wine.
+
+&emsp;Some exploratory plots that I did on my data set are scatter plots, density ridges, and box plots. First, for the log10(price) variable I created a scatter plot, the plot shows that log10(price) and points have a strong  positive correlation. Secondly, for the two categorical variables, I decided to choose geom density ridges, for the variable of expensive10_winery the plot shows that wineries that produce expensive wine lays have higher median, and max points. This is also true for the variable region10_expensive, the regions that produce top 10 most expensive wines are having higher points compared to regions that aren’t producing the most average expensive wine. The two box plots that I created also proves that wineries, and regions that produce expensive wine have higher points.
+
+```{r analysis1, echo=FALSE}
+
+# Justification on why I choose from winery that has the most expensive price (it uses mean price)
+wine_data_FRA %>% group_by(winery) %>% summarize(mean_price = mean(price)) %>% arrange(desc(mean_price)) %>% slice_head(n = 10)
+
+# doing analysis on region_1 that has the higest mean of price and cut slice it to top 10 
+wine_data_FRA %>% group_by(region_1) %>% summarize(mean_price = mean(price)) %>% arrange(desc(mean_price)) %>% slice_head(n = 10)
+
+```
+
+```{r analysis2, include=FALSE}
+
+# estimates for region that are in the top 10 most expensive, and top 10 most expensive winery 
+estimates_points = 79.162783	+ 6.601360	* log10(6.601360) - 2.373422	- 1.399671	
+
+estimates_points
+
+# estimates for region that are not in the top 10 most expensive, and top 10 most expensive winery 
+
+estimates_points1 = 79.162783	+ 6.601360	* log10(6.601360)
+estimates_points1 
+```
+
+```{r model-building1, echo=FALSE, message=FALSE}
+#creates density ridge plot for expensive10_winery
+ggplot( data = FRA_wine_train, mapping = aes( x = points, y = expensive10_winery, fill = expensive10_winery)) +
+  geom_density_ridges(alpha = 0.9) +     
+        labs(x= "Wine ratings(points)",
+       fill= "Top 10 most Expensive Winery",
+       title = "Wine Ratings on Top 10 most expensive winery in France")
+
+#creates density ridge plot for expensive10_region
+ggplot( data = FRA_wine_train, mapping = aes( x = points, y = expensive10_region, fill = expensive10_region)) +
+  geom_density_ridges(alpha = 0.9) + 
+       labs(x= "Wine ratings(points)",
+       fill= "Top 10 most Expensive Regions",
+       title = "Wine Ratings on Top 10 most expensive regions in France")
+```
+
+```{r model-building2, echo=FALSE}
+#creates boxplot for expensive10_winery
+ggplot(data = FRA_wine_train, 
+       mapping=aes(x=points,  fill=expensive10_winery)) +
+  geom_boxplot() +
+    labs(x= "Wine ratings(points)",
+       fill= "Top 10 most Expensive Winery",
+       title = "Wine Ratings on Top 10 most expensive winery in France")
+
+FRA_wine_train %>% group_by(expensive10_winery) %>% summarize(median = median(points), IQR = IQR(points))
+
+#creates boxplot for expensive10_region
+ggplot(data = FRA_wine_train, 
+       mapping=aes(x=points,  fill=expensive10_region)) +
+  geom_boxplot() +
+      labs(x= "Wine ratings(points)",
+       fill= "Top 10 most Expensive region",
+       title = "Wine Ratings on Top 10 most regions in France")
+
+FRA_wine_train %>% group_by(expensive10_region) %>% summarize(median = median(points), IQR = IQR(points))
+```
+
+```{r model1, echo=FALSE, message=FALSE}
+# creation of the model1
+wine_main_fit <- lm(points ~ log10(price) + expensive10_winery + expensive10_region, data = FRA_wine_train) 
+tidy(wine_main_fit) %>% select(term, estimate)
+glance(wine_main_fit) %>% 
+  select(r.squared, adj.r.squared)
+
+#compare model to dataset
+wine_prediction <- predict(wine_main_fit, newdata = FRA_wine_train) %>%
+  bind_cols(FRA_wine_train %>% select(points) ) %>%
+  rename(predict = ...1)
+  
+#calculate rmse
+rmse(wine_prediction, truth = points, estimate = predict)
+
+#calculate points range
+FRA_wine_train %>% summarise(min = min(points), max = max(points))
+```
+
+**Slope of log10(price):** 
+Holding all other variables constant, when price increases  by 1 by the factor of 10 we can expect “points” to increase by 6.6 on average. 
+
+**Slope of expensive10_wineryyes:**
+Holding all other variables constant, when the winery is from  expensive10_wineryyes we can expect “points” to decrease by -2.37. 
+
+**Slope of expensive10_wineryyes:**
+Holding all other variables constant, when the winery is from  expensive10_regionyes we can expect “points” to decrease by -1.4 
+
+**Intercept:** 
+The points of wine which are from expensive10_wineryyes, and expensive10_regionyes and log10(price) is expected to be 79.162783 on average. 
+
+From the fitted equations we can assume that the estimated wine ratings, from top 10 most expensive winey, and top 10 expensive region which produces wine, and variety of price to be > 79.162783 +  6.601360 * (-0.02326576)  - 1.399671 = 77.60953
+
+Lastly, the reported R-Squared is 0.4649356, and the Adjusted R-Squared is 0.464755	
+
+***
+
+### Model Proposed by Joncarlo:
+
+```{r model2, echo=FALSE, message=FALSE}
+# Added column determining if that observation had Rosé as it's grape variety.
+# Note: Two logical tests for Rosé due to an ascii symbol error in CSV load.
+FRA_wine_test <- FRA_wine_test %>%
+  mutate(Rosé = ifelse(variety == "Rosé" | variety == "RosÃ©", 'yes', 'no'))
+
+FRA_wine_train <- FRA_wine_train %>%
+  mutate(Rosé = ifelse(variety == "Rosé" | variety == "RosÃ©", 'yes', 'no'))
+
+# Added column determining if that observation had Alsace as it's primary region.
+FRA_wine_test <- FRA_wine_test %>%
+  mutate(Alsace = ifelse(region_1 == "Alsace", 'yes', 'no'))
+
+FRA_wine_train <- FRA_wine_train %>%
+  mutate(Alsace = ifelse(region_1 == "Alsace", 'yes', 'no'))
+
+# Main Effect Model2
+model2 <- lm(points ~ log_price + Rosé + Alsace, data = FRA_wine_train)
+tidy(model2) %>% 
+  select(term, estimate)
+
+glance(model2) %>% 
+  select(r.squared, adj.r.squared)
+
+# Use testing group to make dataframe with points ratings and model2 predictions
+m2_points_pred <- predict(model2, newdata = FRA_wine_test)  %>%
+  bind_cols(FRA_wine_test %>% select(points)) %>% 
+  rename(prediction = ...1)
+
+m2_points_pred %>%
+  slice_head(n = 10)
+
+# calculates root mean square error of predictions using model2
+rmse(m2_points_pred, truth = points, estimate = prediction)
+
+# calculates points rating range for model accuracy analysis
+max(FRA_wine_test$points) - min(FRA_wine_test$points)
+```
+
+&emsp;This model looks at three variables which all play a part in what determines the ratings of wine out of 100 points: Price or cost of the wine, variety of grape that the wine is made from, and the region of France that the wine was produced. Specifically in this model, we are looking at how the grape variety Rosé and the region of Alsace affects the points rating of the wine. These specific types of variety and region was chosen due to how common they showed up in France's wine. With the grapes being the base/start of the process of making wine, it is the first initial cost of producing the product. The certain type of variety can affect cost of wine, taste, and smell before the wine even starts to get produced, all aspects that reviews look at to determine their points. Region is an interesting variable to look at because when it comes to produce, people like to say that when it is grown in certain areas/regions that it comes out better. This means we can look at wine where their grape variety could Rosé, but it was produced in two different regions which may create a difference in points. With an adjusted r-squared value of 0.47, this model can relatively predict the data accurately. 
+
+$$\hat{points} =  79.45 + 2.74 * price + 0.01 * Rosé + 1.12 * Alsace$$
+
+&emsp;Looking at the fit model for this main effects equation, you can see that Rosé does not have a big effect on the slope as it is only multiplied by a miniscule value. This means that whether the variety of grape is Rosé or not, it does not have a big correlation to the overall rating of the wine. But looking at the region of Alsace, it has a bit more of an effect on the rating as it is being multiplied by more than 1, thus increasing the slope more. 
+
+```{r model-building3, echo=FALSE, message=FALSE}
+#Creates scatterplot for rose
+ggplot(data = FRA_wine_train,
+       mapping = aes(x = log(price),
+                     y = points,
+                     color = Rosé)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "log(price)",
+       y = "Points (Rating)",
+       title = "Rosé connection to Price vs Points (Rating)",
+       subtitle = "France Wine Reviews",
+       caption = "Source Data: Kaggle: Wine-Reviews:Zackthoutt")
+
+#creates scatterplot for Alsace
+ggplot(data = FRA_wine_train,
+       mapping = aes(x = log(price),
+                     y = points,
+                     color = Alsace)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "log(price)",
+       y = "Points (Rating)",
+       title = "Alsace connection to Price vs Points (Rating)",
+       subtitle = "France Wine Reviews",
+       caption = "Source Data: Kaggle: Wine-Reviews:Zackthoutt")
+
+```
+
+&emsp;To take a closer look at how the Alsace and Rosé effects the ratings of the wines, we made 2 scatterplots of the ratings and price, but fitted lines that represent whether the variable was present in the wine or not. First thing to notice about both of these plots is that both of these variables do not have data in the higher brackets of costs of wine which may be a big reason why these are some of the most common region and variety. When comparing the two scatterplots, you can see that both of these variables positively increase the slope, but Alsace just multiplies the slope at a higher value. This proves that these variables are correlated to overall rating of the wine, but the region plays a bigger role than the variety.  
+
+***
+
+### Model Proposed by Max:
+
+```{r model3, echo=FALSE, message=FALSE}
+#Creates liear regression main effects model
+model3 <- lm(points ~ log_price + desc_char_count + province_NS, data = FRA_wine_train)
+tidy(model3) %>% select(term, estimate)
+
+#Pulls (adj) r squared values
+glance(model3) %>% select(r.squared, adj.r.squared)
+
+#Creates & prints dataframe with points ratings and model3 predictions using testing group
+points_pred <- predict(model3, newdata = FRA_wine_test)  %>%
+  bind_cols(FRA_wine_test %>% select(points)) %>% 
+  rename(prediction = ...1)
+
+points_pred %>%
+  slice_head(n = 10)
+
+#calculates root mean square error of predictions using model3
+rmse(points_pred, truth = points, estimate = prediction)
+
+#calculates points rating range for model accuracy analysis
+max(FRA_wine_test$points) - min(FRA_wine_test$points)
+```
+
+$$\hat{points} =  77.1 + 5.17 * log\_price + 0.0182 * desc\_char\_count - 0.115 * province\_NSsouth$$
+```{r analysis3, include=FALSE}
+# filters for points value greater than 95
+group1 <- FRA_wine_train %>% 
+  filter(points >= 95)
+
+# proportion of points greater than 95
+prop1 <- nrow(group1) / nrow(FRA_wine_train)
+prop1
+
+# filters for description length of > 250 chars
+group2 <- FRA_wine_train %>%
+  filter(desc_char_count > 250)
+
+# proportion of description > 250 chars
+prop2 <- nrow(group2) / nrow(FRA_wine_train)
+prop2
+
+# filters wines with descriptions > 250 chars for points > 95
+group3 <- group2 %>%
+  filter(points >= 95)
+
+# proportion of points > 95 in group with description > 250 chars
+prop3 <- nrow(group3) / nrow(group2)
+prop3
+```
+
+&emsp;This model examines three variables to determine wine rating out of 100 (points): Price, total number of characters in the description, and province of origin. High quality wines, or those with the best reviews, tend to be those that have a sense of luxury associated with them. Aspects such as higher prices, long and robust descriptions, and a rich cultural/geographic history can all be used to guage wine quality, and therefore we attempt to use them to predict reviews.
+
+&emsp;While our capitalist society naturally attempts to link price and quality, our assumption that reviews such as the points measure will be dependent on price (log base 10 applied) can be proven using statistical evidence and evaluated for accuracy simultaneously. When using a bootstrap slope generation examining the relationship between log_price and points to extrapolate a population slope estimate, the resulting bootstrap slope distribution is centered near 6.5 (see figure 3.1 below). Using this distribution, a 99% confidence interval is constructed which has a lower bound of 6.28, and an upper bound of 6.66. Therefore, we can determine that our population will have a log_price slope coefficient between 6.28 and 6.66 with 99% confidence. As zero is not in our confidence interval, we are able to determine that log_price and points are correlated, and can stipulate that each time 10 to the power of price results in an increase of 1, or every time log_price increases by 1, points will increase by 6.28-6.66 points likewise with 99% confidence (All other variables held constant).
+
+&emsp;The total characters in the description and the originating province are more pragmatic in their logical correlation. Using exploratory analysis, we can determine the correlation between province of origin being in the north or south of France and the points ratings by visualizing it using a boxplot (Figure 3.2) in which we see wines fro Northern France tend to have a higher poits value or better review. We can do a similar visual check for our final variable.
+
+&emsp;When examining the relationship between the total number of characters in  the description, and the ratings points, we first test to see if they have any association. To determine this, we use a scatterplot, and plot a linear regression line overlaid to give us a visual representation of their correlation (Figure 3.3). To further prove the correlation between the description character count and points, we can examine whether or not longer descriptions have higher ratings using a hypothesis test. For this test we examine the points ratings of 95-100 (note the minimum rating of 80 and maximum of 100). Our null hypothesis $H_0$, would indicate no correlation, and uses the number of wines present within the range of 95-100 points (`r nrow(group1)`) to determine the proportion (`r prop1`%) that we would expect to see present in said range. Another variable, long_desc is recoded from desc_char_count using an arbitrary measure of 250 characters to split the data into 'long' and 'short' categories. `r prop2`% of the listed wines had a description classified as 'long'. When looking solely at the long description wines, `r prop3`% of the listed wines fall under the range of 95-100 points: this is our observed statistic. From this measure we craft our alternative hypothesis, that description length and rating points are correlated. These hypotheses are tested and our observed statistic falls far from the expected range of proportions (see figure 3.4 below). Our p-value is calculated at zero, indicating there are few to no cases where a predicted proportion is more unlikely than our observed statistic, and we can confidently reject the null hypothesis that dissuades correlation between points and desc_char_count.
+
+**Figure 3.1**
+```{r model-building4, echo=FALSE}
+# This chunk examines the explanatory variable price
+
+# Bootstrap generation
+boot_slope_price <- FRA_wine_train %>%
+                specify(points ~ log_price) %>%
+                generate(reps = 1000, type = "bootstrap") %>%
+                calculate(stat = "slope") 
+
+#Create bootstrap distribution histogram
+ggplot(data = boot_slope_price,
+       mapping = aes(x = stat)) +
+  geom_histogram(binwidth = 0.01, col = "black", fill = "white") +
+  labs(x = "Bootstrap slope estimate",
+       y = "Frequency",
+       title = "Bootstrap Slope Distribution",
+       subtitle = "1,000 bootstrap resampled slope etimates",
+       caption = "Source Data: Kaggle: Wine-Reviews:Zackthoutt")
+
+#Calculates 99% confidence interval
+boot_slope_price %>%
+  summarize(
+    lower = quantile(stat, 0.005),
+    upper = quantile(stat, 0.995))
+```
+  
+**Figure 3.2**
+```{r model-building5, echo=FALSE}
+# This chunk examines the explanatory variable province_NS
+
+#Plots relationship between province and points
+ggplot(data = wine_data_FRA,
+       mapping = aes(x = points, fill = province_NS)) +
+  geom_boxplot() +
+  labs(x = "Wine Enthusiast rating (0-100 points)",
+       y = "North/South province location",
+       title = "Wine Province of Origin (North/South) and Points Ratings",
+       fill = "Province_NS",
+       caption = "Data Credits: Kaggle: Wine-Reviews:Zackthoutt") +
+  theme(
+    axis.ticks.y = element_blank(),
+    axis.text.y = element_blank())
+```
+
+**Figure 3.3**
+```{r model-building6, echo=FALSE, message=FALSE, warning=FALSE}
+#The following two chunks examine the explanatory variable desc_char_count
+
+#Plots relationship between desc character total and points
+ggplot(data = wine_data_FRA,
+       mapping = aes(x = desc_char_count, y = points))+
+  geom_point(position = "jitter") +
+  geom_smooth(method = "lm") + 
+  labs(x = "Wine description character count",
+       y = "Wine Enthusiast rating (0-100 points)",
+       title = "Wine Description Length and Points Ratings",
+       caption = "Data Credits: Kaggle: Wine-Reviews:Zackthoutt")
+```
+
+**Figure 3.4**
+```{r model-building7, echo=FALSE, warning=FALSE}
+#Creates new recoded variable for local analysis
+FRA_wine_train <- FRA_wine_train %>%
+  mutate(long_desc = if_else(desc_char_count > 250, "long", "short"))
+
+#Generates a null distribution determining expected proportions of long descriptions
+null_dist <- FRA_wine_train %>%
+             specify(response = long_desc, success =  "long") %>% 
+             hypothesize(null = "point", p = prop1 ) %>% 
+             generate(reps = 1000, type = "draw") %>% 
+             calculate(stat = "prop")
+
+#Plots null distribution and shades observations less or equally likely to the observed stat
+null_dist %>% 
+  visualize() + 
+  shade_p_value(obs_stat=prop3, direction = "both")
+
+#Gets p value
+null_dist %>% get_p_value(obs_stat=prop3, direction="both")
+```
+
+***
+
+### Model Results
+
+```{r model-results, echo=FALSE}
+#Reads in results data from CSV
+m_results <- read.csv("http://students.washington.edu/maxjayne/model-results.csv")
+
+#Creates styled table for results(instead of tibble)
+m_results %>%
+  kbl() %>%
+  kable_styling()
+```
+
+***
+
+## Section 3 - Results
+
+**Model 1 (proposed by Ali):**
+$$\hat{points} = 79.162783 + 6.601360	* log\_price - 2.373422 * expensive10\_wineryyes - 1.399671 * expensive10\_regionyes$$
+
+**Model 2 (proposed by Joncarlo):**
+$$\hat{points} =  79.45 + 2.74 * price + 0.01 * Rosé + 1.12 * Alsace$$
+
+**Model 3 (proposed by Max):**
+$$\hat{points} =  77.1 + 5.17 * log\_price + 0.0182 * desc\_char\_count - 0.115 * province\_NSsouth$$
+
+&emsp;After developing three separate linear regression models for data prediction, we have determined model 3 to be the best fitting model for two primary reasons. The first is that it has the highest r squared and adjusted r squared values at 0.597 for both, which correspond to the percentage of the variance in the data explained by the variables in the model. The second is that it has the lowest RMSE values at 1.94 meaning that the model predicts points rating with an average accuracy of within 1.94 points. With the points variable having a full range of 20 values in the data set, this predicts well. Since this model has the lower number, and higher r squared we argue that this model is well enough to predict the response variable which is points, or wine ratings resulted from Wine Enthusiast. 
+
+```{r model-fit, echo=FALSE}
+#Applying model 3 to full dataset
+model3_fit <- lm(points ~ log_price + desc_char_count + province_NS, data = wine_data_FRA)
+tidy(model3_fit) %>% select(term, estimate)
+
+glance(model3_fit) %>% select(r.squared, adj.r.squared)
+
+#Creates & prints dataframe with points ratings and model3 predictions
+fit_pred <- predict(model3_fit, newdata = wine_data_FRA)  %>%
+  bind_cols(wine_data_FRA %>% select(points)) %>% 
+  rename(prediction = ...1)
+
+fit_pred %>%
+  slice_head(n = 10)
+
+#calculates root mean square error of predictions using model3
+rmse(fit_pred, truth = points, estimate = prediction)
+```
+
+&emsp;When fit to the entire dataset used (as opposed to the training data) model 3’s points prediction process starts with an intercept of 77.1 indicating that all other variables equalling to zero (or north in the case of province_NS) would result in a wine being rated at 77.1 out of 100 in the points measure. The log_price slope coefficient is calculated at 5.17, indicating that every time log_price increases by 1 (or 10 to the power of price increases by 1), the review rating will increase by 5.17 points. The desc_char_count slope coefficient is calculated at 0.0182, indicating that for every character in the wine description, the points rating will increase by 0.0179 points, or for about every 5 and half characters, points rating will increase by 1. Lastly, the province_NSsouth slope coefficient is calculated at -0.0497, indicating that a wine will lose five hundreths of a rating point if it originated in the south of France as opposed to the north. In reflection, province_NS did not have as strong of a correlation with points as the other two explanatory variables. Model 3 can be given by the equation:
+
+$$\hat{points} =  77.1 + 5.17 * log\_price + 0.0179 * desc\_char\_count - 0.0497 * province\_NSsouth$$
+
+&emsp;Overall, the model does a good job of predicting the points data. From the model we can make conclusions about how the variables can effect the wine review. One of the scientific questions raised by our group is how higher prices influence the ratings of a certain wine, and from model 3 we can conclude that price does have a strong positive correlation with points, although the wine is not necessarily better or higher quality than wine that has lower price. We can also conclude that description length can have an effect on wine review and so can the province it originated, though less so. There are lots of factors that effect wine review points ratings, without attempting to account for all of them, the selected model predicts accurately.
+
+***
+
+## Bibliography
+
+Zackthoutt. (2017). Wine Reviews (Kaggle; version 4) [data set] https://www.kaggle.com/zynicide/wine-reviews
+
+White, Roland D. “Brace yourself for booze-flation. Your holiday alcohol run is just the beginning.” Los Angeles Times, December 13th, 2021, 
+https://www.latimes.com/business/story/2021-12-13/why-your-holiday-booze-costs-more-this-year-alcohol-inflation
+
+Kavanagh, Don “The Inexorable Rise of Wine Prices” Wine-Searcher, June 7th, 2019, https://www.wine-searcher.com/m/2019/06/the-inexorable-rise-of-wine-prices	
+
+Svitil, Kathy “Wine Study Shows Price Influences Perception” Caltech, January 14th, 2008, https://www.caltech.edu/about/news/wine-study-shows-price-influences-perception-1374
+
+Morais, Rodolfo “Fresh Wine Regions and History” Grapes and Grains, June 2nd, 2017, https://www.grapesandgrains.org/2017/06/french-wine-regions-and-history.html
+
+Masterclass, “A Complete Guide to 13 Types of Wine”, July 21st, 2021 https://www.masterclass.com/articles/a-complete-guide-to-13-types-of-wine#all-about-red-wine

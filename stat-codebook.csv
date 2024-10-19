@@ -1,0 +1,22 @@
+No,Variables,Type,Description
+1,Country,Character,The country where the wine is from(country of origin)
+2,description,Character,"The description of the wine’s taste, smell, look, feel, etc"
+3,designation,Character ,The vineyard within the winery where the grapes that made the wine are from
+4,points,Numerical,WineEnthusiast’s rating of the wine on a scale from 1-100
+5,price,Numerical,The cost of for a bottle of wine
+6,province,Categorical ,Province or state the wine is from
+7,region1,Categorical ,The wine growing area in a province or state(i.e Napa)
+8,region 2,Categorical ,"More specific regions specified within a wine growing area (ie Rutherford inside the Napa Valley), but this value can sometimes be blank"
+9,taster_name,Categorical ,Taster Name 
+10,taster_twitter_handle,Categorical,Taster’s Twitter handle
+11,Title ,Categorical ,The title of the wine review
+12,variety,Categorical,The type of grapes used to make the wine (ie Pinot Noir)
+13,winery,Categorical,The Winery that produced the wine
+14,desc_char_count,Numerical (recoded),The total number of characters in the description variable
+15,log_price,Numerical (recoded),Wine price with log base 10 function applied
+16,province_NS,Categorical (recoded),Whether the wine originated from a province in the north or south of France
+17,expensive10_winery,Categorical (recoded),Whether the wine came from one of the top 10 most expensive wineries in France
+18,expensive10_region,Categorical (recoded),Whether the wine came from one of the top 10 most expensive wine regions in France
+19,Rose,Categorical (recoded),Whether the wine is of the variety Rose or not
+20,Alsace,Categorical (recoded),Whether the wine is from the Alsace region or not
+21,long_desc,Categorical (recoded),Whether the wine description contains more than 250 characters or not
